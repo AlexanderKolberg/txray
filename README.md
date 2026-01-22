@@ -23,45 +23,25 @@ npm install -g bun
 bun i
 ```
 
-3. Fetch common ABIs (ERC20, ERC721, ERC1155, Seaport):
-
-```bash
-./fetch-common-abis.sh
-```
-
-4. Link the CLI globally:
+3. Link the CLI globally:
 
 ```bash
 bun link
 ```
 
-## Known Topics and Contracts
+## Adding ABIs
 
-The `known.ts` file at the project root contains human-readable mappings for common event topics and contract addresses:
+The tool uses ABIs to decode transactions. Here are different ways to add them:
 
-```typescript
-// Event topic hashes → readable names
-export const KNOWN_TOPICS: Record<string, string> = {
-  '0xddf252ad...': 'Transfer',
-  '0x8c5be1e5...': 'Approval',
-  // ...
-};
+### Fetch Common ABIs
 
-// Contract addresses → readable names
-export const KNOWN_CONTRACTS: Record<string, string> = {
-  '0x0000000000000068f116a894984e2db1123eb395': 'Seaport 1.6',
-  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': 'WETH (Mainnet)',
-  // ...
-};
+Fetch a set of common ABIs (ERC20, ERC721, ERC1155, Seaport):
+
+```bash
+./fetch-common-abis.sh
 ```
 
-These mappings are used during trace decoding to display friendly names instead of raw hashes/addresses. Add your own commonly-used topics and contracts here.
-
-ABI files in `abi/` can also export their own `KNOWN_TOPICS` and `KNOWN_CONTRACTS` which will be merged with the base mappings.
-
-## Adding Common ABIs
-
-To add more ABIs to be fetched automatically, edit the `ABIS` array in `fetch-common-abis.sh`:
+To add more ABIs to this set, edit the `ABIS` array in `fetch-common-abis.sh`:
 
 ```bash
 ABIS=(
@@ -71,9 +51,7 @@ ABIS=(
 )
 ```
 
-Then run `./fetch-common-abis.sh` to download them.
-
-## Adding ABIs from Foundry Projects
+### Extract from Foundry Projects
 
 Requires [Foundry](https://book.getfoundry.sh/getting-started/installation):
 
@@ -105,6 +83,36 @@ Output format:
 ```typescript
 export const MY_CONTRACT_ABI = [...] as const;
 ```
+
+### Manual ABI Files
+
+You can also add ABI files manually to the `abi/` directory. Each file can export:
+- An ABI array as a const export
+- Optional `KNOWN_TOPICS` and `KNOWN_CONTRACTS` mappings
+
+## Known Topics and Contracts
+
+The `known.ts` file at the project root contains human-readable mappings for common event topics and contract addresses:
+
+```typescript
+// Event topic hashes → readable names
+export const KNOWN_TOPICS: Record<string, string> = {
+  '0xddf252ad...': 'Transfer',
+  '0x8c5be1e5...': 'Approval',
+  // ...
+};
+
+// Contract addresses → readable names
+export const KNOWN_CONTRACTS: Record<string, string> = {
+  '0x0000000000000068f116a894984e2db1123eb395': 'Seaport 1.6',
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': 'WETH (Mainnet)',
+  // ...
+};
+```
+
+These mappings are used during trace decoding to display friendly names instead of raw hashes/addresses. Add your own commonly-used topics and contracts here.
+
+ABI files in `abi/` can also export their own `KNOWN_TOPICS` and `KNOWN_CONTRACTS` which will be merged with the base mappings.
 
 ## Usage
 
