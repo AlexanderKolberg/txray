@@ -1,0 +1,5 @@
+node_modules/
+abi/*
+!abi/.gitkeep
+*.log
+.DS_Store

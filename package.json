@@ -1,0 +1,19 @@
+{
+	"name": "txray",
+	"version": "1.0.0",
+	"type": "module",
+	"bin": {
+		"txray": "./src/cli.ts"
+	},
+	"scripts": {
+		"start": "bun src/cli.ts"
+	},
+	"dependencies": {
+		"@0xsequence/network": "^2.3.39",
+		"ethers": "^6.15.0",
+		"viem": "^2.36.0"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.2.17"
+	}
+}
