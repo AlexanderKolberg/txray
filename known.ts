@@ -12,6 +12,9 @@ export const KNOWN_TOPICS: Record<string, string> = {
 	'0x1f180c27086c7a39ea2a7b25239d1ab92348f07ca7bb59d1438fcf527568f881': 'OpExecuted',
 	'0xed679328aebf74ede77ae09efcf36e90244f83643dadac1c2d9f0b21a46f6ab7': 'Sweep',
 	'0x9ae934bf8a986157c889a24c3b3fa85e74b7e4ee4b1f8fc6e7362cb4c1d19d8b': 'CallSkipped',
+
+	// Polygon
+	'0x4dfe1bbbcf077ddc3e01291eea2d5c70c2b422b415d95645b9adcfd678cb1d63': 'LogFeeTransfer',
 };
 
 export const KNOWN_CONTRACTS: Record<string, string> = {
