@@ -1,40 +1,30 @@
 import { allNetworks, findNetworkConfig, type NetworkConfig } from '@0xsequence/network';
 
-const EXPLORER_PATTERNS: Array<{
-	pattern: RegExp;
-	chainId: number;
-}> = [
-	{ pattern: /etherscan\.io/, chainId: 1 },
-	{ pattern: /polygonscan\.com/, chainId: 137 },
-	{ pattern: /arbiscan\.io/, chainId: 42161 },
-	{ pattern: /optimistic\.etherscan\.io/, chainId: 10 },
-	{ pattern: /basescan\.org/, chainId: 8453 },
-	{ pattern: /bscscan\.com/, chainId: 56 },
-	{ pattern: /snowtrace\.io/, chainId: 43114 },
-	{ pattern: /ftmscan\.com/, chainId: 250 },
-	{ pattern: /gnosisscan\.io/, chainId: 100 },
-	{ pattern: /celoscan\.io/, chainId: 42220 },
-	{ pattern: /moonbeam\.moonscan\.io/, chainId: 1284 },
-	{ pattern: /moonriver\.moonscan\.io/, chainId: 1285 },
-	{ pattern: /nova\.arbiscan\.io/, chainId: 42170 },
-	{ pattern: /blastscan\.io/, chainId: 81457 },
-	{ pattern: /lineascan\.build/, chainId: 59144 },
-	{ pattern: /mantlescan\.xyz/, chainId: 5000 },
-	{ pattern: /scrollscan\.com/, chainId: 534352 },
-	{ pattern: /era\.zksync\.network/, chainId: 324 },
-	{ pattern: /sepolia\.etherscan\.io/, chainId: 11155111 },
-	{ pattern: /goerli\.etherscan\.io/, chainId: 5 },
-	{ pattern: /mumbai\.polygonscan\.com/, chainId: 80001 },
-	{ pattern: /amoy\.polygonscan\.com/, chainId: 80002 },
-	{ pattern: /sepolia\.arbiscan\.io/, chainId: 421614 },
-	{ pattern: /sepolia-optimism\.etherscan\.io/, chainId: 11155420 },
-	{ pattern: /sepolia\.basescan\.org/, chainId: 84532 },
-];
-
 export interface ParsedTxUrl {
 	txHash: `0x${string}`;
 	chainId: number;
 	network: NetworkConfig;
+}
+
+function getHostname(url: string): string | null {
+	try {
+		return new URL(url).hostname.toLowerCase();
+	} catch {
+		return null;
+	}
+}
+
+function fuzzyMatchHostname(inputHost: string, explorerHost: string): boolean {
+	if (inputHost === explorerHost) return true;
+
+	const normalizedInput = inputHost.replace(/^www\./, '');
+	const normalizedExplorer = explorerHost.replace(/^www\./, '');
+	if (normalizedInput === normalizedExplorer) return true;
+
+	if (normalizedInput.endsWith(`.${normalizedExplorer}`)) return true;
+	if (normalizedExplorer.endsWith(`.${normalizedInput}`)) return true;
+
+	return false;
 }
 
 export function parseExplorerUrl(url: string): ParsedTxUrl {
@@ -44,20 +34,35 @@ export function parseExplorerUrl(url: string): ParsedTxUrl {
 	}
 	const txHash = txHashMatch[1].toLowerCase() as `0x${string}`;
 
-	const matchedExplorer = EXPLORER_PATTERNS.find((e) => e.pattern.test(url));
-	if (!matchedExplorer) {
-		throw new Error(`Unknown block explorer: ${url}`);
+	const inputHostname = getHostname(url);
+	if (!inputHostname) {
+		throw new Error(`Invalid URL: ${url}`);
 	}
 
-	const network = findNetworkConfig(allNetworks, matchedExplorer.chainId);
-	if (!network) {
-		throw new Error(`Network config not found for chain ID: ${matchedExplorer.chainId}`);
+	let matchedNetwork = allNetworks.find((network) => {
+		const explorerUrl = network.blockExplorer?.rootUrl;
+		if (!explorerUrl) return false;
+		const explorerHostname = getHostname(explorerUrl);
+		return explorerHostname === inputHostname;
+	});
+
+	if (!matchedNetwork) {
+		matchedNetwork = allNetworks.find((network) => {
+			const explorerUrl = network.blockExplorer?.rootUrl;
+			if (!explorerUrl) return false;
+			const explorerHostname = getHostname(explorerUrl);
+			return explorerHostname && fuzzyMatchHostname(inputHostname, explorerHostname);
+		});
+	}
+
+	if (!matchedNetwork) {
+		throw new Error(`Unknown block explorer: ${url}`);
 	}
 
 	return {
 		txHash,
-		chainId: matchedExplorer.chainId,
-		network,
+		chainId: matchedNetwork.chainId,
+		network: matchedNetwork,
 	};
 }
 
