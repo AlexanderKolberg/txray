@@ -1,4 +1,5 @@
 import type { NetworkConfig } from '@0xsequence/network';
+import pc from 'picocolors';
 import {
 	createPublicClient,
 	decodeEventLog,
@@ -165,56 +166,60 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 
 export function formatDebugResult(result: DebugResult): string {
 	const lines: string[] = [];
-	const hr = '='.repeat(80);
+	const hr = pc.dim('─'.repeat(70));
 
 	lines.push(hr);
-	lines.push(`TRANSACTION DEBUG - ${result.network.title || result.network.name}`);
+	lines.push(`${pc.bold('TRANSACTION')} ${pc.dim('·')} ${pc.cyan(result.network.title || result.network.name)}`);
 	lines.push(hr);
 	lines.push('');
-	lines.push(`Hash: ${result.txHash}`);
-	lines.push(`Status: ${result.status}`);
-	lines.push(`Block: ${result.blockNumber}`);
-	lines.push(`Time: ${result.timestamp.toISOString()}`);
-	lines.push(`From: ${result.from}`);
-	lines.push(`To: ${result.to || '(contract creation)'}`);
-	lines.push(`Value: ${formatEther(result.value)} ${result.network.nativeToken?.symbol || 'ETH'}`);
-	lines.push(`Gas Used: ${result.gasUsed.toLocaleString()}`);
+	lines.push(`${pc.dim('Hash:')}   ${pc.white(result.txHash)}`);
+	const statusColor = result.status === 'success' ? pc.green : pc.red;
+	lines.push(`${pc.dim('Status:')} ${statusColor(result.status)}`);
+	lines.push(`${pc.dim('Block:')}  ${pc.white(String(result.blockNumber))}`);
+	lines.push(`${pc.dim('Time:')}   ${pc.white(result.timestamp.toISOString())}`);
+	lines.push(`${pc.dim('From:')}   ${pc.white(result.from)}`);
+	lines.push(`${pc.dim('To:')}     ${result.to ? pc.white(result.to) : pc.dim('(contract creation)')}`);
+	const valueStr = formatEther(result.value);
+	const symbol = result.network.nativeToken?.symbol || 'ETH';
+	lines.push(`${pc.dim('Value:')}  ${valueStr !== '0' ? pc.yellow(valueStr) : pc.dim(valueStr)} ${pc.dim(symbol)}`);
+	lines.push(`${pc.dim('Gas:')}    ${pc.white(result.gasUsed.toLocaleString())}`);
 	lines.push('');
 
 	if (result.errors.length > 0) {
 		lines.push(hr);
-		lines.push('ERRORS FOUND');
+		lines.push(`${pc.red(pc.bold('ERRORS'))} ${pc.red(`(${result.errors.length})`)}`);
 		lines.push(hr);
 		for (const error of result.errors) {
-			lines.push(`Source: ${error.source}`);
-			lines.push(`Error: ${error.errorName}`);
-			if (error.message) lines.push(`Message: ${error.message}`);
+			lines.push(`${pc.dim('Source:')}  ${pc.white(error.source)}`);
+			lines.push(`${pc.dim('Error:')}   ${pc.red(error.errorName)}`);
+			if (error.message) lines.push(`${pc.dim('Message:')} ${pc.red(error.message)}`);
 			lines.push('');
 		}
 	}
 
 	lines.push(hr);
-	lines.push(`EVENT LOGS (${result.logs.length})`);
+	lines.push(`${pc.bold('EVENTS')} ${pc.dim(`(${result.logs.length})`)}`);
 	lines.push(hr);
 	for (const log of result.logs) {
-		lines.push(`#${log.index + 1} ${log.eventName || 'Unknown'}`);
-		lines.push(`  Contract: ${log.address}`);
-		if (log.addressLabel) lines.push(`           ${log.addressLabel}`);
+		const eventName = log.eventName || 'Unknown';
+		lines.push(`${pc.dim('#' + (log.index + 1))} ${pc.cyan(eventName)}`);
+		lines.push(`   ${pc.dim('Contract:')} ${pc.white(log.address)}`);
+		if (log.addressLabel) lines.push(`             ${pc.yellow(log.addressLabel)}`);
 		if (log.decoded) {
 			for (const [key, value] of Object.entries(log.decoded)) {
 				const formatted = formatValue(value);
-				lines.push(`  ${key}: ${formatted}`);
+				lines.push(`   ${pc.dim(key + ':')} ${formatted}`);
 			}
 		}
 		lines.push('');
 	}
 
 	lines.push(hr);
-	lines.push('DEBUG LINKS');
+	lines.push(`${pc.bold('LINKS')}`);
 	lines.push(hr);
-	lines.push(`Explorer: ${result.links.explorer}`);
-	lines.push(`Tenderly: ${result.links.tenderly}`);
-	lines.push(`Phalcon:  ${result.links.phalcon}`);
+	lines.push(`${pc.dim('Explorer:')} ${pc.blue(pc.underline(result.links.explorer))}`);
+	lines.push(`${pc.dim('Tenderly:')} ${pc.blue(pc.underline(result.links.tenderly))}`);
+	lines.push(`${pc.dim('Phalcon:')}  ${pc.blue(pc.underline(result.links.phalcon))}`);
 	lines.push(hr);
 
 	return lines.join('\n');
@@ -224,16 +229,16 @@ function formatValue(value: unknown): string {
 	if (typeof value === 'bigint') {
 		const str = value.toString();
 		if (value > 10n ** 15n && value < 10n ** 30n) {
-			return `${str} (${formatEther(value)} if 18 decimals)`;
+			return `${pc.magenta(str)} ${pc.dim(`(${formatEther(value)} if 18 decimals)`)}`;
 		}
-		return str;
+		return pc.magenta(str);
 	}
 	if (typeof value === 'string' && value.startsWith('0x') && value.length === 42) {
 		const label = KNOWN_CONTRACTS[value.toLowerCase()];
-		return label ? `${value} (${label})` : value;
+		return label ? `${pc.white(value)} ${pc.yellow(`(${label})`)}` : pc.white(value);
 	}
 	if (Array.isArray(value)) {
-		return `[${value.length} items]`;
+		return pc.dim(`[${value.length} items]`);
 	}
-	return String(value);
+	return pc.white(String(value));
 }
