@@ -1,3 +1,8 @@
+import {
+	KNOWN_TOPICS as PRIVATE_TOPICS,
+	KNOWN_CONTRACTS as PRIVATE_CONTRACTS,
+} from './known-private';
+
 export const KNOWN_TOPICS: Record<string, string> = {
 	'0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef': 'Transfer',
 	'0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925': 'Approval',
@@ -15,6 +20,9 @@ export const KNOWN_TOPICS: Record<string, string> = {
 
 	// Polygon
 	'0x4dfe1bbbcf077ddc3e01291eea2d5c70c2b422b415d95645b9adcfd678cb1d63': 'LogFeeTransfer',
+
+	// Private (not committed to repo)
+	...PRIVATE_TOPICS,
 };
 
 export const KNOWN_CONTRACTS: Record<string, string> = {
@@ -41,4 +49,7 @@ export const KNOWN_CONTRACTS: Record<string, string> = {
 
 	// Chain-specific
 	'0x0000000000000000000000000000000000001010': 'Polygon Fee',
+
+	// Private (not committed to repo)
+	...PRIVATE_CONTRACTS,
 };

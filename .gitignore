@@ -3,3 +3,4 @@ abi/*
 !abi/.gitkeep
 *.log
 .DS_Store
+known-private.ts
