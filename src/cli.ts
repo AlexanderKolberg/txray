@@ -11,6 +11,7 @@ const VERSION = '1.0.0';
 interface ParsedArgs {
 	positional: string[];
 	labels?: string;
+	timeout?: number;
 	json: boolean;
 	help: boolean;
 	version: boolean;
@@ -27,6 +28,11 @@ function parseArgs(args: string[]): ParsedArgs {
 			result.labels = args[++i];
 		} else if (arg.startsWith('--labels=')) {
 			result.labels = arg.slice('--labels='.length);
+		} else if (arg === '--timeout' || arg === '-t') {
+			const val = args[++i];
+			result.timeout = val ? parseInt(val, 10) : undefined;
+		} else if (arg.startsWith('--timeout=')) {
+			result.timeout = parseInt(arg.slice('--timeout='.length), 10);
 		} else if (arg === '--json' || arg === '-j') {
 			result.json = true;
 		} else if (arg === '--help' || arg === '-h') {
@@ -149,7 +155,10 @@ async function main() {
 		let result: DebugResult;
 
 		if (parsed.json) {
-			result = await debugTransaction(network, txHash, { labelsPath: parsed.labels });
+			result = await debugTransaction(network, txHash, {
+				labelsPath: parsed.labels,
+				timeout: parsed.timeout,
+			});
 			console.log(formatJsonResult(result));
 		} else {
 			const spinner = ora({
@@ -158,7 +167,10 @@ async function main() {
 			}).start();
 
 			try {
-				result = await debugTransaction(network, txHash, { labelsPath: parsed.labels });
+				result = await debugTransaction(network, txHash, {
+					labelsPath: parsed.labels,
+					timeout: parsed.timeout,
+				});
 				spinner.succeed('Transaction fetched');
 				console.log('');
 				console.log(formatDebugResult(result));
@@ -196,6 +208,7 @@ ${pc.yellow('OPTIONS:')}
   ${pc.cyan('--help, -h')}            Show this help message
   ${pc.cyan('--version, -v')}         Show version number
   ${pc.cyan('--json, -j')}            Output in JSON format
+  ${pc.cyan('--timeout, -t')} ${pc.dim('<ms>')}    Request timeout in milliseconds (default: 30000)
   ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}   Load address labels from a JSON file
 
 ${pc.yellow('EXAMPLES:')}

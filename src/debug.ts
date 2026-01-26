@@ -52,6 +52,46 @@ export interface DecodedError {
 
 export interface DebugOptions {
 	labelsPath?: string;
+	timeout?: number;
+}
+
+class TxRayError extends Error {
+	constructor(
+		message: string,
+		public readonly code?: string
+	) {
+		super(message);
+		this.name = 'TxRayError';
+	}
+}
+
+function parseRpcError(error: unknown): TxRayError {
+	const message = (error as Error).message || String(error);
+
+	if (message.includes('not found') || message.includes('could not be found')) {
+		return new TxRayError('Transaction not found. Check the hash and network.', 'TX_NOT_FOUND');
+	}
+
+	if (message.includes('rate limit') || message.includes('429')) {
+		return new TxRayError('Rate limited by RPC. Try again in a few seconds.', 'RATE_LIMITED');
+	}
+
+	if (
+		message.includes('timeout') ||
+		message.includes('ETIMEDOUT') ||
+		message.includes('ECONNRESET')
+	) {
+		return new TxRayError(
+			'Request timed out. Try increasing --timeout or check your connection.',
+			'TIMEOUT'
+		);
+	}
+
+	if (message.includes('ENOTFOUND') || message.includes('getaddrinfo')) {
+		return new TxRayError('Could not reach RPC. Check your internet connection.', 'NETWORK_ERROR');
+	}
+
+	return new TxRayError(message, 'RPC_ERROR');
 }
 
 export async function debugTransaction(
@@ -60,16 +100,24 @@ export async function debugTransaction(
 	options: DebugOptions = {}
 ): Promise<DebugResult> {
 	const labels = loadLabels(options.labelsPath);
+	const timeout = options.timeout ?? 30000;
+
 	const client = createPublicClient({
-		transport: http(getRpcUrl(network)),
+		transport: http(getRpcUrl(network), { timeout }),
 	});
 
 	const [tx, receipt] = await Promise.all([
-		client.getTransaction({ hash: txHash }),
-		client.getTransactionReceipt({ hash: txHash }),
+		client.getTransaction({ hash: txHash }).catch((error) => {
+			throw parseRpcError(error);
+		}),
+		client.getTransactionReceipt({ hash: txHash }).catch((error) => {
+			throw parseRpcError(error);
+		}),
 	]);
 
-	const block = await client.getBlock({ blockNumber: receipt.blockNumber });
+	const block = await client.getBlock({ blockNumber: receipt.blockNumber }).catch((error) => {
+		throw parseRpcError(error);
+	});
 
 	const logs = decodeAllLogs(receipt.logs, labels);
 	const errors = extractErrors(logs);
