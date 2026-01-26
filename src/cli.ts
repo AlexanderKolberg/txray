@@ -10,6 +10,7 @@ import { gasCommand } from './gas.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { queryCommand } from './query.js';
 import { selectorCommand } from './selectors.js';
+import { simulateCommand } from './simulate.js';
 import { stateDiffCommand } from './state-diff.js';
 import { traceCommand } from './trace.js';
 
@@ -73,6 +74,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	gas: gasCommand,
 	flow: flowCommand,
 	query: queryCommand,
+	simulate: simulateCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
