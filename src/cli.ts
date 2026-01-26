@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import ora from 'ora';
 import pc from 'picocolors';
+import { abiFetchCommand } from './abi-fetch.js';
 import { configCommand, loadConfig } from './config.js';
 import { type DebugResult, debugTransaction, formatDebugResult } from './debug.js';
 import { decodeCommand } from './decode.js';
@@ -77,6 +78,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	query: queryCommand,
 	simulate: simulateCommand,
 	debug: interactiveCommand,
+	abi: abiFetchCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
