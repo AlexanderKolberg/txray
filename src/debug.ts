@@ -10,6 +10,7 @@ import {
 	type Log,
 } from 'viem';
 import { ALL_ABIS, KNOWN_TOPICS } from './abis.js';
+import { resolveAddresses } from './ens.js';
 import { type Labels, loadLabels } from './labels.js';
 import { getExplorerTxUrl, getPhalconUrl, getRpcUrl, getTenderlyUrl } from './networks.js';
 
@@ -53,6 +54,7 @@ export interface DecodedError {
 export interface DebugOptions {
 	labelsPath?: string;
 	timeout?: number;
+	noEns?: boolean;
 }
 
 class TxRayError extends Error {
@@ -122,6 +124,25 @@ export async function debugTransaction(
 	const logs = decodeAllLogs(receipt.logs, labels);
 	const errors = extractErrors(logs);
 
+	const mergedLabels = { ...labels };
+
+	if (!options.noEns && network.chainId === 1) {
+		const addresses = [tx.from, tx.to, ...logs.map((l) => l.address)].filter(
+			(a): a is string => !!a
+		);
+		const ensNames = await resolveAddresses(addresses).catch(() => new Map<string, string>());
+		for (const [addr, name] of ensNames) {
+			if (!mergedLabels[addr]) {
+				mergedLabels[addr] = name;
+			}
+		}
+	}
+
+	const logsWithEns = logs.map((log) => ({
+		...log,
+		addressLabel: mergedLabels[log.address.toLowerCase()] ?? log.addressLabel,
+	}));
+
 	return {
 		network,
 		txHash,
@@ -132,14 +153,14 @@ export async function debugTransaction(
 		to: tx.to,
 		value: tx.value,
 		gasUsed: receipt.gasUsed,
-		logs,
+		logs: logsWithEns,
 		errors,
 		links: {
 			explorer: getExplorerTxUrl(network, txHash),
 			tenderly: getTenderlyUrl(network, txHash),
 			phalcon: getPhalconUrl(network, txHash),
 		},
-		labels,
+		labels: mergedLabels,
 	};
 }
 
