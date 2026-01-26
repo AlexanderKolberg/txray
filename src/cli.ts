@@ -7,6 +7,7 @@ import { decodeCommand } from './decode.js';
 import { diffCommand } from './diff.js';
 import { flowCommand } from './flow.js';
 import { gasCommand } from './gas.js';
+import { interactiveCommand } from './interactive.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { queryCommand } from './query.js';
 import { selectorCommand } from './selectors.js';
@@ -75,6 +76,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	flow: flowCommand,
 	query: queryCommand,
 	simulate: simulateCommand,
+	debug: interactiveCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
