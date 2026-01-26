@@ -9,7 +9,8 @@ import {
 	http,
 	type Log,
 } from 'viem';
-import { ALL_ABIS, KNOWN_CONTRACTS, KNOWN_TOPICS } from './abis.js';
+import { ALL_ABIS, KNOWN_TOPICS } from './abis.js';
+import { type Labels, loadLabels } from './labels.js';
 import { getExplorerTxUrl, getPhalconUrl, getRpcUrl, getTenderlyUrl } from './networks.js';
 
 export interface DebugResult {
@@ -29,6 +30,7 @@ export interface DebugResult {
 		tenderly: string;
 		phalcon: string;
 	};
+	labels: Labels;
 }
 
 export interface DecodedLog {
@@ -48,10 +50,16 @@ export interface DecodedError {
 	data: string;
 }
 
+export interface DebugOptions {
+	labelsPath?: string;
+}
+
 export async function debugTransaction(
 	network: NetworkConfig,
-	txHash: `0x${string}`
+	txHash: `0x${string}`,
+	options: DebugOptions = {}
 ): Promise<DebugResult> {
+	const labels = loadLabels(options.labelsPath);
 	const client = createPublicClient({
 		transport: http(getRpcUrl(network)),
 	});
@@ -63,7 +71,7 @@ export async function debugTransaction(
 
 	const block = await client.getBlock({ blockNumber: receipt.blockNumber });
 
-	const logs = decodeAllLogs(receipt.logs);
+	const logs = decodeAllLogs(receipt.logs, labels);
 	const errors = extractErrors(logs);
 
 	return {
@@ -83,12 +91,13 @@ export async function debugTransaction(
 			tenderly: getTenderlyUrl(network, txHash),
 			phalcon: getPhalconUrl(network, txHash),
 		},
+		labels,
 	};
 }
 
-function decodeAllLogs(logs: Log[]): DecodedLog[] {
+function decodeAllLogs(logs: Log[], labels: Labels): DecodedLog[] {
 	return logs.map((log, i) => {
-		const addressLabel = KNOWN_CONTRACTS[log.address.toLowerCase()];
+		const addressLabel = labels[log.address.toLowerCase()];
 		const topic0 = log.topics[0];
 
 		let eventName: string | undefined;
@@ -165,6 +174,7 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 }
 
 export function formatDebugResult(result: DebugResult): string {
+	const { labels } = result;
 	const lines: string[] = [];
 	const hr = pc.dim('─'.repeat(70));
 
@@ -213,7 +223,7 @@ export function formatDebugResult(result: DebugResult): string {
 		if (log.addressLabel) lines.push(`             ${pc.yellow(log.addressLabel)}`);
 		if (log.decoded) {
 			for (const [key, value] of Object.entries(log.decoded)) {
-				const formatted = formatValue(value);
+				const formatted = formatValue(value, labels);
 				lines.push(`   ${pc.dim(`${key}:`)} ${formatted}`);
 			}
 		}
@@ -231,7 +241,7 @@ export function formatDebugResult(result: DebugResult): string {
 	return lines.join('\n');
 }
 
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, labels: Labels): string {
 	if (typeof value === 'bigint') {
 		const str = value.toString();
 		if (value > 10n ** 15n && value < 10n ** 30n) {
@@ -240,7 +250,7 @@ function formatValue(value: unknown): string {
 		return pc.magenta(str);
 	}
 	if (typeof value === 'string' && value.startsWith('0x') && value.length === 42) {
-		const label = KNOWN_CONTRACTS[value.toLowerCase()];
+		const label = labels[value.toLowerCase()];
 		return label ? `${pc.white(value)} ${pc.yellow(`(${label})`)}` : pc.white(value);
 	}
 	if (Array.isArray(value)) {
