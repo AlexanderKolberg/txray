@@ -4,6 +4,7 @@ import pc from 'picocolors';
 import { configCommand, loadConfig } from './config.js';
 import { type DebugResult, debugTransaction, formatDebugResult } from './debug.js';
 import { decodeCommand } from './decode.js';
+import { diffCommand } from './diff.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { selectorCommand } from './selectors.js';
 
@@ -52,6 +53,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	selector: selectorCommand,
 	decode: decodeCommand,
 	config: configCommand,
+	diff: diffCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
@@ -201,12 +203,14 @@ ${pc.yellow('USAGE:')}
   ${pc.cyan('txray')} ${pc.dim('<tx-hash> [chain-id] [options]')}
   ${pc.cyan('txray selector')} ${pc.dim('<0x...>')}
   ${pc.cyan('txray decode')} ${pc.dim('<calldata> | --tx <hash>')}
+  ${pc.cyan('txray diff')} ${pc.dim('<tx1> <tx2>')}
   ${pc.cyan('txray config')} ${pc.dim('[show|set|path]')}
 
 ${pc.yellow('COMMANDS:')}
   ${pc.cyan('selector')} ${pc.dim('<0x...>')}         Look up function signature by 4-byte selector
   ${pc.cyan('decode')} ${pc.dim('<calldata>')}        Decode calldata using loaded ABIs
   ${pc.cyan('decode')} ${pc.dim('--tx <hash>')}       Decode calldata from transaction
+  ${pc.cyan('diff')} ${pc.dim('<tx1> <tx2>')}         Compare two transactions
   ${pc.cyan('config')} ${pc.dim('[show|set|path]')}   Show or modify configuration
 
 ${pc.yellow('OPTIONS:')}
@@ -226,6 +230,7 @@ ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray selector 0xa9059cbb')}
   ${pc.dim('txray decode 0xa9059cbb000000000000...')}
   ${pc.dim('txray decode --tx 0xabc123... --chain 1')}
+  ${pc.dim('txray diff https://etherscan.io/tx/0x123... https://etherscan.io/tx/0x456...')}
 
 ${pc.yellow('LABELS:')}
   ${pc.dim('Address labels are loaded from (in priority order):')}
