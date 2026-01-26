@@ -1,17 +1,16 @@
 #!/usr/bin/env bun
 import pc from 'picocolors';
-import { parseExplorerUrl, getNetworkByChainId } from './networks.js';
 import { debugTransaction, formatDebugResult } from './debug.js';
+import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 
 async function main() {
 	const args = process.argv.slice(2);
+	const input = args[0];
 
-	if (args.length === 0) {
+	if (!input) {
 		printUsage();
 		process.exit(1);
 	}
-
-	const input = args[0];
 
 	try {
 		let txHash: `0x${string}`;
@@ -21,11 +20,14 @@ async function main() {
 			const parsed = parseExplorerUrl(input);
 			txHash = parsed.txHash;
 			chainId = parsed.chainId;
-			console.log(`${pc.dim('Chain:')} ${pc.cyan(parsed.network.title || parsed.network.name)} ${pc.dim(`(${chainId})`)}`);
+			console.log(
+				`${pc.dim('Chain:')} ${pc.cyan(parsed.network.title ?? parsed.network.name)} ${pc.dim(`(${chainId})`)}`
+			);
 		} else if (input.startsWith('0x')) {
 			txHash = input.toLowerCase() as `0x${string}`;
-			chainId = args[1] ? parseInt(args[1], 10) : 1;
-			if (isNaN(chainId)) {
+			const chainArg = args[1];
+			chainId = chainArg ? parseInt(chainArg, 10) : 1;
+			if (Number.isNaN(chainId)) {
 				console.error(pc.red('Invalid chain ID'));
 				process.exit(1);
 			}
