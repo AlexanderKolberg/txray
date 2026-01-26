@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import pc from 'picocolors';
 import { debugTransaction, formatDebugResult } from './debug.js';
+import { decodeCommand } from './decode.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { selectorCommand } from './selectors.js';
 
@@ -30,6 +31,7 @@ function parseArgs(args: string[]): ParsedArgs {
 
 const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	selector: selectorCommand,
+	decode: decodeCommand,
 };
 
 async function main() {
@@ -93,9 +95,12 @@ ${pc.yellow('USAGE:')}
   ${pc.cyan('txray')} ${pc.dim('<explorer-url> [options]')}
   ${pc.cyan('txray')} ${pc.dim('<tx-hash> [chain-id] [options]')}
   ${pc.cyan('txray selector')} ${pc.dim('<0x...>')}
+  ${pc.cyan('txray decode')} ${pc.dim('<calldata> | --tx <hash>')}
 
 ${pc.yellow('COMMANDS:')}
-  ${pc.cyan('selector')} ${pc.dim('<0x...>')}  Look up function signature by 4-byte selector
+  ${pc.cyan('selector')} ${pc.dim('<0x...>')}         Look up function signature by 4-byte selector
+  ${pc.cyan('decode')} ${pc.dim('<calldata>')}        Decode calldata using loaded ABIs
+  ${pc.cyan('decode')} ${pc.dim('--tx <hash>')}       Decode calldata from transaction
 
 ${pc.yellow('OPTIONS:')}
   ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}  Load address labels from a JSON file
@@ -107,6 +112,8 @@ ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray 0xabc123... 137')}
   ${pc.dim('txray 0xabc123... 1 --labels ./my-labels.json')}
   ${pc.dim('txray selector 0xa9059cbb')}
+  ${pc.dim('txray decode 0xa9059cbb000000000000...')}
+  ${pc.dim('txray decode --tx 0xabc123... --chain 1')}
 
 ${pc.yellow('LABELS:')}
   ${pc.dim('Address labels are loaded from (in priority order):')}
