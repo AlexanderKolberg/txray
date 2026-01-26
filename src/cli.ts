@@ -10,6 +10,7 @@ import { flowCommand } from './flow.js';
 import { gasCommand } from './gas.js';
 import { interactiveCommand } from './interactive.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
+import { proxyCommand } from './proxy.js';
 import { queryCommand } from './query.js';
 import { selectorCommand } from './selectors.js';
 import { simulateCommand } from './simulate.js';
@@ -79,6 +80,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	simulate: simulateCommand,
 	debug: interactiveCommand,
 	abi: abiFetchCommand,
+	proxy: proxyCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
