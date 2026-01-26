@@ -2,15 +2,15 @@ import type { NetworkConfig } from '@0xsequence/network';
 import pc from 'picocolors';
 import {
 	createPublicClient,
-	decodeEventLog,
 	decodeErrorResult,
+	decodeEventLog,
 	formatEther,
-	http,
 	type Hex,
+	http,
 	type Log,
 } from 'viem';
-import { getRpcUrl, getExplorerTxUrl, getTenderlyUrl, getPhalconUrl } from './networks.js';
-import { ALL_ABIS, KNOWN_TOPICS, KNOWN_CONTRACTS } from './abis.js';
+import { ALL_ABIS, KNOWN_CONTRACTS, KNOWN_TOPICS } from './abis.js';
+import { getExplorerTxUrl, getPhalconUrl, getRpcUrl, getTenderlyUrl } from './networks.js';
 
 export interface DebugResult {
 	network: NetworkConfig;
@@ -100,7 +100,7 @@ function decodeAllLogs(logs: Log[]): DecodedLog[] {
 				topics: log.topics as [Hex, ...Hex[]],
 			});
 			eventName = result.eventName;
-			decoded = result.args as Record<string, unknown>;
+			decoded = (result.args ?? {}) as Record<string, unknown>;
 		} catch {
 			eventName = topic0 ? KNOWN_TOPICS[topic0] : undefined;
 		}
@@ -152,7 +152,7 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 	} catch {
 		if (data.startsWith('0x08c379a0')) {
 			try {
-				const length = Number('0x' + data.slice(74, 138));
+				const length = Number(`0x${data.slice(74, 138)}`);
 				const message = Buffer.from(data.slice(138, 138 + length * 2), 'hex').toString('utf8');
 				return { errorName: 'Error', message };
 			} catch {
@@ -169,7 +169,9 @@ export function formatDebugResult(result: DebugResult): string {
 	const hr = pc.dim('─'.repeat(70));
 
 	lines.push(hr);
-	lines.push(`${pc.bold('TRANSACTION')} ${pc.dim('·')} ${pc.cyan(result.network.title || result.network.name)}`);
+	lines.push(
+		`${pc.bold('TRANSACTION')} ${pc.dim('·')} ${pc.cyan(result.network.title || result.network.name)}`
+	);
 	lines.push(hr);
 	lines.push('');
 	lines.push(`${pc.dim('Hash:')}   ${pc.white(result.txHash)}`);
@@ -178,10 +180,14 @@ export function formatDebugResult(result: DebugResult): string {
 	lines.push(`${pc.dim('Block:')}  ${pc.white(String(result.blockNumber))}`);
 	lines.push(`${pc.dim('Time:')}   ${pc.white(result.timestamp.toISOString())}`);
 	lines.push(`${pc.dim('From:')}   ${pc.white(result.from)}`);
-	lines.push(`${pc.dim('To:')}     ${result.to ? pc.white(result.to) : pc.dim('(contract creation)')}`);
+	lines.push(
+		`${pc.dim('To:')}     ${result.to ? pc.white(result.to) : pc.dim('(contract creation)')}`
+	);
 	const valueStr = formatEther(result.value);
 	const symbol = result.network.nativeToken?.symbol || 'ETH';
-	lines.push(`${pc.dim('Value:')}  ${valueStr !== '0' ? pc.yellow(valueStr) : pc.dim(valueStr)} ${pc.dim(symbol)}`);
+	lines.push(
+		`${pc.dim('Value:')}  ${valueStr !== '0' ? pc.yellow(valueStr) : pc.dim(valueStr)} ${pc.dim(symbol)}`
+	);
 	lines.push(`${pc.dim('Gas:')}    ${pc.white(result.gasUsed.toLocaleString())}`);
 	lines.push('');
 
@@ -202,13 +208,13 @@ export function formatDebugResult(result: DebugResult): string {
 	lines.push(hr);
 	for (const log of result.logs) {
 		const eventName = log.eventName || 'Unknown';
-		lines.push(`${pc.dim('#' + (log.index + 1))} ${pc.cyan(eventName)}`);
+		lines.push(`${pc.dim(`#${log.index + 1}`)} ${pc.cyan(eventName)}`);
 		lines.push(`   ${pc.dim('Contract:')} ${pc.white(log.address)}`);
 		if (log.addressLabel) lines.push(`             ${pc.yellow(log.addressLabel)}`);
 		if (log.decoded) {
 			for (const [key, value] of Object.entries(log.decoded)) {
 				const formatted = formatValue(value);
-				lines.push(`   ${pc.dim(key + ':')} ${formatted}`);
+				lines.push(`   ${pc.dim(`${key}:`)} ${formatted}`);
 			}
 		}
 		lines.push('');

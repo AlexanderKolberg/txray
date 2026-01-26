@@ -1,6 +1,6 @@
 import {
-	KNOWN_TOPICS as PRIVATE_TOPICS,
 	KNOWN_CONTRACTS as PRIVATE_CONTRACTS,
+	KNOWN_TOPICS as PRIVATE_TOPICS,
 } from './known-private';
 
 export const KNOWN_TOPICS: Record<string, string> = {

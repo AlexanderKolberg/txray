@@ -6,7 +6,12 @@
 		"txray": "./src/cli.ts"
 	},
 	"scripts": {
-		"start": "bun src/cli.ts"
+		"start": "bun src/cli.ts",
+		"typecheck": "bun x tsc --noEmit",
+		"lint": "oxlint --deny-warnings && biome check .",
+		"lint:fix": "oxlint --fix && biome check --write .",
+		"format": "biome format --write .",
+		"check": "bun run typecheck && bun run lint"
 	},
 	"dependencies": {
 		"@0xsequence/network": "^2.3.39",
@@ -14,6 +19,8 @@
 		"viem": "^2.36.0"
 	},
 	"devDependencies": {
-		"@types/bun": "^1.2.17"
+		"@biomejs/biome": "^2.3.13",
+		"@types/bun": "^1.2.17",
+		"oxlint": "^1.42.0"
 	}
 }

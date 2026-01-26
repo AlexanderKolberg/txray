@@ -1,9 +1,9 @@
-import { readdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
-	KNOWN_TOPICS as baseKnownTopics,
 	KNOWN_CONTRACTS as baseKnownContracts,
+	KNOWN_TOPICS as baseKnownTopics,
 } from '../known.js';
 import { COMMON_ERRORS_ABI } from './errors.js';
 
@@ -13,10 +13,14 @@ const abiDir = join(__dirname, '..', 'abi');
 type AbiItem = {
 	type: string;
 	name?: string;
-	inputs?: Array<{ indexed?: boolean; name: string; type: string }>;
+	inputs?: ReadonlyArray<{
+		readonly indexed?: boolean;
+		readonly name: string;
+		readonly type: string;
+	}>;
 };
 
-const allAbis: AbiItem[] = [...COMMON_ERRORS_ABI];
+const allAbis: AbiItem[] = [...(COMMON_ERRORS_ABI as unknown as AbiItem[])];
 const knownTopics: Record<string, string> = { ...baseKnownTopics };
 const knownContracts: Record<string, string> = { ...baseKnownContracts };
 

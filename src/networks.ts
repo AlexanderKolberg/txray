@@ -29,7 +29,7 @@ function fuzzyMatchHostname(inputHost: string, explorerHost: string): boolean {
 
 export function parseExplorerUrl(url: string): ParsedTxUrl {
 	const txHashMatch = url.match(/\/tx\/(0x[a-fA-F0-9]{64})/);
-	if (!txHashMatch) {
+	if (!txHashMatch?.[1]) {
 		throw new Error(`Could not extract transaction hash from URL: ${url}`);
 	}
 	const txHash = txHashMatch[1].toLowerCase() as `0x${string}`;
