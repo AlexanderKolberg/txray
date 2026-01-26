@@ -7,6 +7,8 @@ export interface Config {
 	timeout?: number;
 	outputFormat?: 'pretty' | 'json';
 	customRpcs?: Record<number, string>;
+	fallbackRpcs?: Record<number, string[]>;
+	retryAttempts?: number;
 }
 
 const CONFIG_DIR = join(homedir(), '.config', 'txray');
@@ -17,6 +19,8 @@ const DEFAULT_CONFIG: Config = {
 	timeout: 30000,
 	outputFormat: 'pretty',
 	customRpcs: {},
+	fallbackRpcs: {},
+	retryAttempts: 3,
 };
 
 function ensureConfigDir(): void {
@@ -69,6 +73,30 @@ export function getCustomRpcUrl(chainId: number): string | undefined {
 
 	const config = loadConfig();
 	return config.customRpcs?.[chainId];
+}
+
+export function getAllRpcUrls(chainId: number): string[] {
+	const config = loadConfig();
+	const urls: string[] = [];
+
+	const envRpc = process.env.TXRAY_RPC_URL;
+	if (envRpc) urls.push(envRpc);
+
+	const customRpc = config.customRpcs?.[chainId];
+	if (customRpc) urls.push(customRpc);
+
+	const fallbacks = config.fallbackRpcs?.[chainId];
+	if (fallbacks) urls.push(...fallbacks);
+
+	return urls;
+}
+
+export function getRetryAttempts(): number {
+	const envRetry = process.env.TXRAY_RETRY_ATTEMPTS;
+	if (envRetry) return Number.parseInt(envRetry, 10);
+
+	const config = loadConfig();
+	return config.retryAttempts ?? 3;
 }
 
 export async function configCommand(args: string[]): Promise<void> {
