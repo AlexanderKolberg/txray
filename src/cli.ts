@@ -8,6 +8,7 @@ import { diffCommand } from './diff.js';
 import { flowCommand } from './flow.js';
 import { gasCommand } from './gas.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
+import { queryCommand } from './query.js';
 import { selectorCommand } from './selectors.js';
 import { stateDiffCommand } from './state-diff.js';
 import { traceCommand } from './trace.js';
@@ -62,6 +63,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	'state-diff': stateDiffCommand,
 	gas: gasCommand,
 	flow: flowCommand,
+	query: queryCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
@@ -216,6 +218,7 @@ ${pc.yellow('USAGE:')}
   ${pc.cyan('txray state-diff')} ${pc.dim('<tx>')}
   ${pc.cyan('txray gas')} ${pc.dim('<tx>')}
   ${pc.cyan('txray flow')} ${pc.dim('<tx>')}
+  ${pc.cyan('txray query')} ${pc.dim('<subcommand> <address> ...')}
   ${pc.cyan('txray config')} ${pc.dim('[show|set|path]')}
 
 ${pc.yellow('COMMANDS:')}
@@ -227,6 +230,7 @@ ${pc.yellow('COMMANDS:')}
   ${pc.cyan('state-diff')} ${pc.dim('<tx>')}         Show storage changes (requires archive node)
   ${pc.cyan('gas')} ${pc.dim('<tx>')}                Gas breakdown and top consumers
   ${pc.cyan('flow')} ${pc.dim('<tx>')}               Token transfers and fund flow
+  ${pc.cyan('query')} ${pc.dim('<subcommand>')}       Query on-chain state (balance, code, storage, call)
   ${pc.cyan('config')} ${pc.dim('[show|set|path]')}   Show or modify configuration
 
 ${pc.yellow('OPTIONS:')}
@@ -251,6 +255,8 @@ ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray state-diff 0x123... 1')}
   ${pc.dim('txray gas 0x123... 1')}
   ${pc.dim('txray flow 0x123... 1')}
+  ${pc.dim('txray query balance 0x1234...abcd --chain 1')}
+  ${pc.dim('txray query call 0x1234...abcd "balanceOf(address)" 0x5678...efgh')}
 
 ${pc.yellow('LABELS:')}
   ${pc.dim('Address labels are loaded from (in priority order):')}
