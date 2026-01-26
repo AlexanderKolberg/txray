@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -24,21 +24,39 @@ const allAbis: AbiItem[] = [...(COMMON_ERRORS_ABI as unknown as AbiItem[])];
 const knownTopics: Record<string, string> = { ...baseKnownTopics };
 const knownContracts: Record<string, string> = { ...baseKnownContracts };
 
-const files = readdirSync(abiDir).filter((f) => f.endsWith('.ts'));
+async function loadAbis(): Promise<void> {
+	if (!existsSync(abiDir)) {
+		return;
+	}
 
-for (const file of files) {
-	const mod = await import(join(abiDir, file));
+	let files: string[];
+	try {
+		files = readdirSync(abiDir).filter((f) => f.endsWith('.ts'));
+	} catch (error) {
+		console.warn(`Warning: Failed to read ABI directory: ${(error as Error).message}`);
+		return;
+	}
 
-	for (const [key, value] of Object.entries(mod)) {
-		if (Array.isArray(value)) {
-			allAbis.push(...(value as AbiItem[]));
-		} else if (key === 'KNOWN_TOPICS' && typeof value === 'object') {
-			Object.assign(knownTopics, value);
-		} else if (key === 'KNOWN_CONTRACTS' && typeof value === 'object') {
-			Object.assign(knownContracts, value);
+	for (const file of files) {
+		try {
+			const mod = await import(join(abiDir, file));
+
+			for (const [key, value] of Object.entries(mod)) {
+				if (Array.isArray(value)) {
+					allAbis.push(...(value as AbiItem[]));
+				} else if (key === 'KNOWN_TOPICS' && typeof value === 'object') {
+					Object.assign(knownTopics, value);
+				} else if (key === 'KNOWN_CONTRACTS' && typeof value === 'object') {
+					Object.assign(knownContracts, value);
+				}
+			}
+		} catch (error) {
+			console.warn(`Warning: Failed to load ABI from ${file}: ${(error as Error).message}`);
 		}
 	}
 }
+
+await loadAbis();
 
 export const ALL_ABIS = allAbis;
 export const KNOWN_TOPICS = knownTopics;

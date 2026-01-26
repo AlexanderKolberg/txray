@@ -9,7 +9,18 @@ import {
 	http,
 	type Log,
 } from 'viem';
-import { ALL_ABIS, KNOWN_CONTRACTS, KNOWN_TOPICS } from './abis.js';
+import { ALL_ABIS, KNOWN_TOPICS } from './abis.js';
+import {
+	BIGINT_THRESHOLD_HIGH,
+	BIGINT_THRESHOLD_LOW,
+	DEFAULT_TIMEOUT_MS,
+	ERROR_DATA_OFFSET,
+	ERROR_LENGTH_END,
+	ERROR_SELECTOR_REVERT,
+	HR_WIDTH,
+} from './constants.js';
+import { resolveAddresses } from './ens.js';
+import { type Labels, loadLabels } from './labels.js';
 import { getExplorerTxUrl, getPhalconUrl, getRpcUrl, getTenderlyUrl } from './networks.js';
 
 export interface DebugResult {
@@ -29,6 +40,7 @@ export interface DebugResult {
 		tenderly: string;
 		phalcon: string;
 	};
+	labels: Labels;
 }
 
 export interface DecodedLog {
@@ -48,23 +60,97 @@ export interface DecodedError {
 	data: string;
 }
 
+export interface DebugOptions {
+	labelsPath?: string;
+	timeout?: number;
+	noEns?: boolean;
+}
+
+class TxRayError extends Error {
+	constructor(
+		message: string,
+		public readonly code?: string
+	) {
+		super(message);
+		this.name = 'TxRayError';
+	}
+}
+
+function parseRpcError(error: unknown): TxRayError {
+	const message = (error as Error).message || String(error);
+
+	if (message.includes('not found') || message.includes('could not be found')) {
+		return new TxRayError('Transaction not found. Check the hash and network.', 'TX_NOT_FOUND');
+	}
+
+	if (message.includes('rate limit') || message.includes('429')) {
+		return new TxRayError('Rate limited by RPC. Try again in a few seconds.', 'RATE_LIMITED');
+	}
+
+	if (
+		message.includes('timeout') ||
+		message.includes('ETIMEDOUT') ||
+		message.includes('ECONNRESET')
+	) {
+		return new TxRayError(
+			'Request timed out. Try increasing --timeout or check your connection.',
+			'TIMEOUT'
+		);
+	}
+
+	if (message.includes('ENOTFOUND') || message.includes('getaddrinfo')) {
+		return new TxRayError('Could not reach RPC. Check your internet connection.', 'NETWORK_ERROR');
+	}
+
+	return new TxRayError(message, 'RPC_ERROR');
+}
+
 export async function debugTransaction(
 	network: NetworkConfig,
-	txHash: `0x${string}`
+	txHash: `0x${string}`,
+	options: DebugOptions = {}
 ): Promise<DebugResult> {
+	const labels = loadLabels(options.labelsPath);
+	const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
+
 	const client = createPublicClient({
-		transport: http(getRpcUrl(network)),
+		transport: http(getRpcUrl(network), { timeout }),
 	});
 
 	const [tx, receipt] = await Promise.all([
-		client.getTransaction({ hash: txHash }),
-		client.getTransactionReceipt({ hash: txHash }),
+		client.getTransaction({ hash: txHash }).catch((error) => {
+			throw parseRpcError(error);
+		}),
+		client.getTransactionReceipt({ hash: txHash }).catch((error) => {
+			throw parseRpcError(error);
+		}),
 	]);
 
-	const block = await client.getBlock({ blockNumber: receipt.blockNumber });
+	const block = await client.getBlock({ blockNumber: receipt.blockNumber }).catch((error) => {
+		throw parseRpcError(error);
+	});
 
-	const logs = decodeAllLogs(receipt.logs);
+	const logs = decodeAllLogs(receipt.logs, labels);
 	const errors = extractErrors(logs);
+
+	const mergedLabels = { ...labels };
+
+	if (!options.noEns && network.chainId === 1) {
+		const addresses = [tx.from, tx.to, ...logs.map((l) => l.address)].filter(
+			(a): a is string => !!a
+		);
+		const ensNames = await resolveAddresses(addresses).catch(() => new Map<string, string>());
+		for (const [addr, name] of ensNames) {
+			if (!mergedLabels[addr]) {
+				mergedLabels[addr] = name;
+			}
+		}
+	}
+
+	const logsWithEns = logs.map((log) => ({
+		...log,
+		addressLabel: mergedLabels[log.address.toLowerCase()] ?? log.addressLabel,
+	}));
 
 	return {
 		network,
@@ -76,19 +162,20 @@ export async function debugTransaction(
 		to: tx.to,
 		value: tx.value,
 		gasUsed: receipt.gasUsed,
-		logs,
+		logs: logsWithEns,
 		errors,
 		links: {
 			explorer: getExplorerTxUrl(network, txHash),
 			tenderly: getTenderlyUrl(network, txHash),
 			phalcon: getPhalconUrl(network, txHash),
 		},
+		labels: mergedLabels,
 	};
 }
 
-function decodeAllLogs(logs: Log[]): DecodedLog[] {
+function decodeAllLogs(logs: Log[], labels: Labels): DecodedLog[] {
 	return logs.map((log, i) => {
-		const addressLabel = KNOWN_CONTRACTS[log.address.toLowerCase()];
+		const addressLabel = labels[log.address.toLowerCase()];
 		const topic0 = log.topics[0];
 
 		let eventName: string | undefined;
@@ -150,10 +237,13 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 			message: result.args?.[0] as string | undefined,
 		};
 	} catch {
-		if (data.startsWith('0x08c379a0')) {
+		if (data.startsWith(ERROR_SELECTOR_REVERT)) {
 			try {
-				const length = Number(`0x${data.slice(74, 138)}`);
-				const message = Buffer.from(data.slice(138, 138 + length * 2), 'hex').toString('utf8');
+				const length = Number(`0x${data.slice(ERROR_DATA_OFFSET, ERROR_LENGTH_END)}`);
+				const message = Buffer.from(
+					data.slice(ERROR_LENGTH_END, ERROR_LENGTH_END + length * 2),
+					'hex'
+				).toString('utf8');
 				return { errorName: 'Error', message };
 			} catch {
 				return null;
@@ -165,8 +255,9 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 }
 
 export function formatDebugResult(result: DebugResult): string {
+	const { labels } = result;
 	const lines: string[] = [];
-	const hr = pc.dim('─'.repeat(70));
+	const hr = pc.dim('─'.repeat(HR_WIDTH));
 
 	lines.push(hr);
 	lines.push(
@@ -213,7 +304,7 @@ export function formatDebugResult(result: DebugResult): string {
 		if (log.addressLabel) lines.push(`             ${pc.yellow(log.addressLabel)}`);
 		if (log.decoded) {
 			for (const [key, value] of Object.entries(log.decoded)) {
-				const formatted = formatValue(value);
+				const formatted = formatValue(value, labels);
 				lines.push(`   ${pc.dim(`${key}:`)} ${formatted}`);
 			}
 		}
@@ -231,16 +322,16 @@ export function formatDebugResult(result: DebugResult): string {
 	return lines.join('\n');
 }
 
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, labels: Labels): string {
 	if (typeof value === 'bigint') {
 		const str = value.toString();
-		if (value > 10n ** 15n && value < 10n ** 30n) {
+		if (value > BIGINT_THRESHOLD_LOW && value < BIGINT_THRESHOLD_HIGH) {
 			return `${pc.magenta(str)} ${pc.dim(`(${formatEther(value)} if 18 decimals)`)}`;
 		}
 		return pc.magenta(str);
 	}
 	if (typeof value === 'string' && value.startsWith('0x') && value.length === 42) {
-		const label = KNOWN_CONTRACTS[value.toLowerCase()];
+		const label = labels[value.toLowerCase()];
 		return label ? `${pc.white(value)} ${pc.yellow(`(${label})`)}` : pc.white(value);
 	}
 	if (Array.isArray(value)) {
