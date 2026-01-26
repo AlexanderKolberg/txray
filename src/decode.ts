@@ -1,6 +1,7 @@
 import pc from 'picocolors';
 import { createPublicClient, decodeFunctionData, formatEther, type Hex, http } from 'viem';
 import { ALL_ABIS } from './abis.js';
+import { type DecodeContext, decodeWithPlugins, loadAllDecoders } from './decoder-registry.js';
 import { type Labels, loadLabels } from './labels.js';
 import { getNetworkByChainId, getRpcUrl } from './networks.js';
 import { lookupSelector } from './selectors.js';
@@ -180,8 +181,33 @@ function detectNestedCalls(args: DecodedCall['args'], labels: Labels): DecodedCa
 	return nested;
 }
 
-export async function decodeCalldata(data: Hex, labels: Labels): Promise<DecodedCall> {
+export async function decodeCalldata(
+	data: Hex,
+	labels: Labels,
+	context?: Partial<DecodeContext>
+): Promise<DecodedCall> {
 	const selector = data.slice(0, 10).toLowerCase();
+
+	const pluginContext: DecodeContext = {
+		labels,
+		selector,
+		address: context?.address,
+		chainId: context?.chainId,
+	};
+
+	const pluginResult = decodeWithPlugins(data, pluginContext);
+	if (pluginResult) {
+		return {
+			selector,
+			functionName: pluginResult.name,
+			args: pluginResult.params,
+			nested: pluginResult.nested?.map((n) => ({
+				selector: '',
+				functionName: n.name,
+				args: n.params,
+			})),
+		};
+	}
 
 	try {
 		const result = decodeFunctionData({
@@ -280,6 +306,8 @@ export async function decodeCommand(args: string[]): Promise<void> {
 
 	const labels = loadLabels(labelsPath);
 
+	await loadAllDecoders();
+
 	if (txHash) {
 		console.log(`Fetching transaction ${txHash.slice(0, 10)}...`);
 		const network = getNetworkByChainId(chainId);
@@ -304,6 +332,6 @@ export async function decodeCommand(args: string[]): Promise<void> {
 	console.log(pc.bold('Decoded Calldata:'));
 	console.log(pc.dim('─'.repeat(50)));
 
-	const decoded = await decodeCalldata(data, labels);
+	const decoded = await decodeCalldata(data, labels, { chainId });
 	console.log(formatDecodedCall(decoded, labels));
 }
