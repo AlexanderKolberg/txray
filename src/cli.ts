@@ -2,6 +2,7 @@
 import pc from 'picocolors';
 import { debugTransaction, formatDebugResult } from './debug.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
+import { selectorCommand } from './selectors.js';
 
 interface ParsedArgs {
 	positional: string[];
@@ -27,8 +28,20 @@ function parseArgs(args: string[]): ParsedArgs {
 	return result;
 }
 
+const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
+	selector: selectorCommand,
+};
+
 async function main() {
-	const parsed = parseArgs(process.argv.slice(2));
+	const args = process.argv.slice(2);
+	const firstArg = args[0];
+
+	if (firstArg && SUBCOMMANDS[firstArg]) {
+		await SUBCOMMANDS[firstArg](args.slice(1));
+		return;
+	}
+
+	const parsed = parseArgs(args);
 	const input = parsed.positional[0];
 
 	if (!input) {
@@ -79,6 +92,10 @@ ${pc.bold('txray')} ${pc.dim('- X-ray for EVM transactions')}
 ${pc.yellow('USAGE:')}
   ${pc.cyan('txray')} ${pc.dim('<explorer-url> [options]')}
   ${pc.cyan('txray')} ${pc.dim('<tx-hash> [chain-id] [options]')}
+  ${pc.cyan('txray selector')} ${pc.dim('<0x...>')}
+
+${pc.yellow('COMMANDS:')}
+  ${pc.cyan('selector')} ${pc.dim('<0x...>')}  Look up function signature by 4-byte selector
 
 ${pc.yellow('OPTIONS:')}
   ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}  Load address labels from a JSON file
@@ -89,6 +106,7 @@ ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray https://arbiscan.io/tx/0x789...')}
   ${pc.dim('txray 0xabc123... 137')}
   ${pc.dim('txray 0xabc123... 1 --labels ./my-labels.json')}
+  ${pc.dim('txray selector 0xa9059cbb')}
 
 ${pc.yellow('LABELS:')}
   ${pc.dim('Address labels are loaded from (in priority order):')}
