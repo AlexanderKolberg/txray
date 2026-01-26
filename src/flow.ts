@@ -2,12 +2,14 @@ import type { NetworkConfig } from '@0xsequence/network';
 import pc from 'picocolors';
 import { createPublicClient, decodeEventLog, formatEther, formatUnits, http } from 'viem';
 import { ALL_ABIS } from './abis.js';
+import {
+	DEFAULT_TIMEOUT_MS,
+	ERC20_TRANSFER_TOPIC,
+	ERC1155_BATCH_TOPIC,
+	ERC1155_SINGLE_TOPIC,
+} from './constants.js';
 import { type Labels, loadLabels } from './labels.js';
 import { getRpcUrl } from './networks.js';
-
-const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-const ERC1155_SINGLE_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
-const ERC1155_BATCH_TOPIC = '0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb';
 
 export interface TokenTransfer {
 	type: 'ERC20' | 'ERC721' | 'ERC1155';
@@ -48,7 +50,7 @@ export async function analyzeFlow(
 	txHash: `0x${string}`,
 	options: FlowOptions = {}
 ): Promise<FlowResult> {
-	const timeout = options.timeout ?? 30000;
+	const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
 	const labels = loadLabels(options.labelsPath);
 
 	const client = createPublicClient({

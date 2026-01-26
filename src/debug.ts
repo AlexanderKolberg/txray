@@ -10,6 +10,15 @@ import {
 	type Log,
 } from 'viem';
 import { ALL_ABIS, KNOWN_TOPICS } from './abis.js';
+import {
+	BIGINT_THRESHOLD_HIGH,
+	BIGINT_THRESHOLD_LOW,
+	DEFAULT_TIMEOUT_MS,
+	ERROR_DATA_OFFSET,
+	ERROR_LENGTH_END,
+	ERROR_SELECTOR_REVERT,
+	HR_WIDTH,
+} from './constants.js';
 import { resolveAddresses } from './ens.js';
 import { type Labels, loadLabels } from './labels.js';
 import { getExplorerTxUrl, getPhalconUrl, getRpcUrl, getTenderlyUrl } from './networks.js';
@@ -102,7 +111,7 @@ export async function debugTransaction(
 	options: DebugOptions = {}
 ): Promise<DebugResult> {
 	const labels = loadLabels(options.labelsPath);
-	const timeout = options.timeout ?? 30000;
+	const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
 
 	const client = createPublicClient({
 		transport: http(getRpcUrl(network), { timeout }),
@@ -228,10 +237,13 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 			message: result.args?.[0] as string | undefined,
 		};
 	} catch {
-		if (data.startsWith('0x08c379a0')) {
+		if (data.startsWith(ERROR_SELECTOR_REVERT)) {
 			try {
-				const length = Number(`0x${data.slice(74, 138)}`);
-				const message = Buffer.from(data.slice(138, 138 + length * 2), 'hex').toString('utf8');
+				const length = Number(`0x${data.slice(ERROR_DATA_OFFSET, ERROR_LENGTH_END)}`);
+				const message = Buffer.from(
+					data.slice(ERROR_LENGTH_END, ERROR_LENGTH_END + length * 2),
+					'hex'
+				).toString('utf8');
 				return { errorName: 'Error', message };
 			} catch {
 				return null;
@@ -245,7 +257,7 @@ function tryDecodeError(data: Hex): { errorName: string; message?: string } | nu
 export function formatDebugResult(result: DebugResult): string {
 	const { labels } = result;
 	const lines: string[] = [];
-	const hr = pc.dim('─'.repeat(70));
+	const hr = pc.dim('─'.repeat(HR_WIDTH));
 
 	lines.push(hr);
 	lines.push(
@@ -313,7 +325,7 @@ export function formatDebugResult(result: DebugResult): string {
 function formatValue(value: unknown, labels: Labels): string {
 	if (typeof value === 'bigint') {
 		const str = value.toString();
-		if (value > 10n ** 15n && value < 10n ** 30n) {
+		if (value > BIGINT_THRESHOLD_LOW && value < BIGINT_THRESHOLD_HIGH) {
 			return `${pc.magenta(str)} ${pc.dim(`(${formatEther(value)} if 18 decimals)`)}`;
 		}
 		return pc.magenta(str);
