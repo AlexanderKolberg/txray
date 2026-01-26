@@ -22,10 +22,17 @@ interface ParsedArgs {
 	json: boolean;
 	help: boolean;
 	version: boolean;
+	noEns: boolean;
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-	const result: ParsedArgs = { positional: [], json: false, help: false, version: false };
+	const result: ParsedArgs = {
+		positional: [],
+		json: false,
+		help: false,
+		version: false,
+		noEns: false,
+	};
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i];
@@ -46,6 +53,8 @@ function parseArgs(args: string[]): ParsedArgs {
 			result.help = true;
 		} else if (arg === '--version' || arg === '-v') {
 			result.version = true;
+		} else if (arg === '--no-ens') {
+			result.noEns = true;
 		} else if (!arg.startsWith('-')) {
 			result.positional.push(arg);
 		}
@@ -173,6 +182,7 @@ async function main() {
 			result = await debugTransaction(network, txHash, {
 				labelsPath: parsed.labels,
 				timeout: parsed.timeout,
+				noEns: parsed.noEns,
 			});
 			console.log(formatJsonResult(result));
 		} else {
@@ -185,6 +195,7 @@ async function main() {
 				result = await debugTransaction(network, txHash, {
 					labelsPath: parsed.labels,
 					timeout: parsed.timeout,
+					noEns: parsed.noEns,
 				});
 				spinner.succeed('Transaction fetched');
 				console.log('');
@@ -239,6 +250,7 @@ ${pc.yellow('OPTIONS:')}
   ${pc.cyan('--json, -j')}            Output in JSON format
   ${pc.cyan('--timeout, -t')} ${pc.dim('<ms>')}    Request timeout in milliseconds (default: 30000)
   ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}   Load address labels from a JSON file
+  ${pc.cyan('--no-ens')}              Disable ENS resolution (mainnet only)
 
 ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray https://polygonscan.com/tx/0xabc123...')}
