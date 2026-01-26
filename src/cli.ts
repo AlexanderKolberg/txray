@@ -7,6 +7,7 @@ import { decodeCommand } from './decode.js';
 import { diffCommand } from './diff.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { selectorCommand } from './selectors.js';
+import { stateDiffCommand } from './state-diff.js';
 import { traceCommand } from './trace.js';
 
 const VERSION = '1.0.0';
@@ -56,6 +57,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	config: configCommand,
 	diff: diffCommand,
 	trace: traceCommand,
+	'state-diff': stateDiffCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
@@ -207,6 +209,7 @@ ${pc.yellow('USAGE:')}
   ${pc.cyan('txray decode')} ${pc.dim('<calldata> | --tx <hash>')}
   ${pc.cyan('txray diff')} ${pc.dim('<tx1> <tx2>')}
   ${pc.cyan('txray trace')} ${pc.dim('<tx>')}
+  ${pc.cyan('txray state-diff')} ${pc.dim('<tx>')}
   ${pc.cyan('txray config')} ${pc.dim('[show|set|path]')}
 
 ${pc.yellow('COMMANDS:')}
@@ -215,6 +218,7 @@ ${pc.yellow('COMMANDS:')}
   ${pc.cyan('decode')} ${pc.dim('--tx <hash>')}       Decode calldata from transaction
   ${pc.cyan('diff')} ${pc.dim('<tx1> <tx2>')}         Compare two transactions
   ${pc.cyan('trace')} ${pc.dim('<tx>')}              Get call trace (requires archive node)
+  ${pc.cyan('state-diff')} ${pc.dim('<tx>')}         Show storage changes (requires archive node)
   ${pc.cyan('config')} ${pc.dim('[show|set|path]')}   Show or modify configuration
 
 ${pc.yellow('OPTIONS:')}
@@ -236,6 +240,7 @@ ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray decode --tx 0xabc123... --chain 1')}
   ${pc.dim('txray diff https://etherscan.io/tx/0x123... https://etherscan.io/tx/0x456...')}
   ${pc.dim('txray trace 0x123... 1')}
+  ${pc.dim('txray state-diff 0x123... 1')}
 
 ${pc.yellow('LABELS:')}
   ${pc.dim('Address labels are loaded from (in priority order):')}
