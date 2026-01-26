@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import ora from 'ora';
 import pc from 'picocolors';
+import { configCommand, loadConfig } from './config.js';
 import { type DebugResult, debugTransaction, formatDebugResult } from './debug.js';
 import { decodeCommand } from './decode.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
@@ -50,6 +51,7 @@ function parseArgs(args: string[]): ParsedArgs {
 const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	selector: selectorCommand,
 	decode: decodeCommand,
+	config: configCommand,
 };
 
 function formatJsonResult(result: DebugResult): string {
@@ -137,9 +139,10 @@ async function main() {
 				);
 			}
 		} else if (input.startsWith('0x')) {
+			const config = loadConfig();
 			txHash = input.toLowerCase() as `0x${string}`;
 			const chainArg = parsed.positional[1];
-			chainId = chainArg ? parseInt(chainArg, 10) : 1;
+			chainId = chainArg ? parseInt(chainArg, 10) : (config.defaultChain ?? 1);
 			if (Number.isNaN(chainId)) {
 				console.error(pc.red('Invalid chain ID'));
 				process.exit(1);
@@ -198,11 +201,13 @@ ${pc.yellow('USAGE:')}
   ${pc.cyan('txray')} ${pc.dim('<tx-hash> [chain-id] [options]')}
   ${pc.cyan('txray selector')} ${pc.dim('<0x...>')}
   ${pc.cyan('txray decode')} ${pc.dim('<calldata> | --tx <hash>')}
+  ${pc.cyan('txray config')} ${pc.dim('[show|set|path]')}
 
 ${pc.yellow('COMMANDS:')}
   ${pc.cyan('selector')} ${pc.dim('<0x...>')}         Look up function signature by 4-byte selector
   ${pc.cyan('decode')} ${pc.dim('<calldata>')}        Decode calldata using loaded ABIs
   ${pc.cyan('decode')} ${pc.dim('--tx <hash>')}       Decode calldata from transaction
+  ${pc.cyan('config')} ${pc.dim('[show|set|path]')}   Show or modify configuration
 
 ${pc.yellow('OPTIONS:')}
   ${pc.cyan('--help, -h')}            Show this help message
