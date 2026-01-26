@@ -1,17 +1,23 @@
 #!/usr/bin/env bun
+import ora from 'ora';
 import pc from 'picocolors';
-import { debugTransaction, formatDebugResult } from './debug.js';
+import { type DebugResult, debugTransaction, formatDebugResult } from './debug.js';
 import { decodeCommand } from './decode.js';
 import { getNetworkByChainId, parseExplorerUrl } from './networks.js';
 import { selectorCommand } from './selectors.js';
 
+const VERSION = '1.0.0';
+
 interface ParsedArgs {
 	positional: string[];
 	labels?: string;
+	json: boolean;
+	help: boolean;
+	version: boolean;
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-	const result: ParsedArgs = { positional: [] };
+	const result: ParsedArgs = { positional: [], json: false, help: false, version: false };
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i];
@@ -21,6 +27,12 @@ function parseArgs(args: string[]): ParsedArgs {
 			result.labels = args[++i];
 		} else if (arg.startsWith('--labels=')) {
 			result.labels = arg.slice('--labels='.length);
+		} else if (arg === '--json' || arg === '-j') {
+			result.json = true;
+		} else if (arg === '--help' || arg === '-h') {
+			result.help = true;
+		} else if (arg === '--version' || arg === '-v') {
+			result.version = true;
 		} else if (!arg.startsWith('-')) {
 			result.positional.push(arg);
 		}
@@ -34,9 +46,52 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	decode: decodeCommand,
 };
 
+function formatJsonResult(result: DebugResult): string {
+	const jsonOutput = {
+		network: {
+			name: result.network.name,
+			chainId: result.network.chainId,
+		},
+		txHash: result.txHash,
+		status: result.status,
+		blockNumber: String(result.blockNumber),
+		timestamp: result.timestamp.toISOString(),
+		from: result.from,
+		to: result.to,
+		value: String(result.value),
+		gasUsed: String(result.gasUsed),
+		logs: result.logs.map((log) => ({
+			index: log.index,
+			address: log.address,
+			addressLabel: log.addressLabel,
+			eventName: log.eventName,
+			topics: log.topics,
+			data: log.data,
+			decoded: log.decoded
+				? Object.fromEntries(
+						Object.entries(log.decoded).map(([k, v]) => [k, typeof v === 'bigint' ? String(v) : v])
+					)
+				: undefined,
+		})),
+		errors: result.errors,
+		links: result.links,
+	};
+	return JSON.stringify(jsonOutput, null, 2);
+}
+
 async function main() {
 	const args = process.argv.slice(2);
 	const firstArg = args[0];
+
+	if (firstArg === '--help' || firstArg === '-h' || (!firstArg && args.length === 0)) {
+		printUsage();
+		return;
+	}
+
+	if (firstArg === '--version' || firstArg === '-v') {
+		console.log(`txray v${VERSION}`);
+		return;
+	}
 
 	if (firstArg && SUBCOMMANDS[firstArg]) {
 		await SUBCOMMANDS[firstArg](args.slice(1));
@@ -44,6 +99,17 @@ async function main() {
 	}
 
 	const parsed = parseArgs(args);
+
+	if (parsed.help) {
+		printUsage();
+		return;
+	}
+
+	if (parsed.version) {
+		console.log(`txray v${VERSION}`);
+		return;
+	}
+
 	const input = parsed.positional[0];
 
 	if (!input) {
@@ -59,9 +125,11 @@ async function main() {
 			const parsedUrl = parseExplorerUrl(input);
 			txHash = parsedUrl.txHash;
 			chainId = parsedUrl.chainId;
-			console.log(
-				`${pc.dim('Chain:')} ${pc.cyan(parsedUrl.network.title ?? parsedUrl.network.name)} ${pc.dim(`(${chainId})`)}`
-			);
+			if (!parsed.json) {
+				console.log(
+					`${pc.dim('Chain:')} ${pc.cyan(parsedUrl.network.title ?? parsedUrl.network.name)} ${pc.dim(`(${chainId})`)}`
+				);
+			}
 		} else if (input.startsWith('0x')) {
 			txHash = input.toLowerCase() as `0x${string}`;
 			const chainArg = parsed.positional[1];
@@ -77,19 +145,41 @@ async function main() {
 		}
 
 		const network = getNetworkByChainId(chainId);
-		console.log(`${pc.dim('Fetching')} ${pc.dim(txHash.slice(0, 10))}${pc.dim('...')}\n`);
 
-		const result = await debugTransaction(network, txHash, { labelsPath: parsed.labels });
-		console.log(formatDebugResult(result));
+		let result: DebugResult;
+
+		if (parsed.json) {
+			result = await debugTransaction(network, txHash, { labelsPath: parsed.labels });
+			console.log(formatJsonResult(result));
+		} else {
+			const spinner = ora({
+				text: `Fetching ${txHash.slice(0, 10)}...`,
+				color: 'cyan',
+			}).start();
+
+			try {
+				result = await debugTransaction(network, txHash, { labelsPath: parsed.labels });
+				spinner.succeed('Transaction fetched');
+				console.log('');
+				console.log(formatDebugResult(result));
+			} catch (error) {
+				spinner.fail('Failed to fetch transaction');
+				throw error;
+			}
+		}
 	} catch (error) {
-		console.error(`${pc.red('Error:')} ${(error as Error).message}`);
+		if (!parseArgs(args).json) {
+			console.error(`${pc.red('Error:')} ${(error as Error).message}`);
+		} else {
+			console.error(JSON.stringify({ error: (error as Error).message }));
+		}
 		process.exit(1);
 	}
 }
 
 function printUsage() {
 	console.log(`
-${pc.bold('txray')} ${pc.dim('- X-ray for EVM transactions')}
+${pc.bold('txray')} ${pc.dim(`v${VERSION}`)} ${pc.dim('- X-ray for EVM transactions')}
 
 ${pc.yellow('USAGE:')}
   ${pc.cyan('txray')} ${pc.dim('<explorer-url> [options]')}
@@ -103,13 +193,17 @@ ${pc.yellow('COMMANDS:')}
   ${pc.cyan('decode')} ${pc.dim('--tx <hash>')}       Decode calldata from transaction
 
 ${pc.yellow('OPTIONS:')}
-  ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}  Load address labels from a JSON file
+  ${pc.cyan('--help, -h')}            Show this help message
+  ${pc.cyan('--version, -v')}         Show version number
+  ${pc.cyan('--json, -j')}            Output in JSON format
+  ${pc.cyan('--labels, -l')} ${pc.dim('<path>')}   Load address labels from a JSON file
 
 ${pc.yellow('EXAMPLES:')}
   ${pc.dim('txray https://polygonscan.com/tx/0xabc123...')}
   ${pc.dim('txray https://etherscan.io/tx/0xdef456...')}
   ${pc.dim('txray https://arbiscan.io/tx/0x789...')}
   ${pc.dim('txray 0xabc123... 137')}
+  ${pc.dim('txray 0xabc123... 1 --json')}
   ${pc.dim('txray 0xabc123... 1 --labels ./my-labels.json')}
   ${pc.dim('txray selector 0xa9059cbb')}
   ${pc.dim('txray decode 0xa9059cbb000000000000...')}
